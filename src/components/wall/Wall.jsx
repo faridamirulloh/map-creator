@@ -1,9 +1,10 @@
 import { useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import { ArrayOfLength } from '../../libs/customPropTypes';
+import { IS_DEV } from '../../constants/constant';
 
-const name = (type) => `./public/textures/paving-stones-${type}.jpg`;
-const stone = './public/textures/stone.jpg';
+const name = (type) => `.${IS_DEV? '/public' : ''}/textures/paving-stones-${type}.jpg`;
+const stone = `.${IS_DEV? '/public' : ''}/textures/stone.jpg`;
 
 const wallHeight = 3;
 

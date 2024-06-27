@@ -3,8 +3,9 @@ import { useFrame, useLoader } from '@react-three/fiber';
 import { TextureLoader } from 'three';
 import PropTypes from 'prop-types';
 import { ArrayOfLength } from '../../libs/customPropTypes';
+import { IS_DEV } from '../../constants/constant';
 
-const color = './public/textures/green-shine.jpg';
+const color = `.${IS_DEV? '/public' : ''}/textures/green-shine.jpg`;
 const pathHeight = 2;
 const bounceInterval = 1.5;
 const bounceWidth = .3;
@@ -53,8 +54,6 @@ export function Path({line = {start: [0, 0], end: [5, -5]}}) {
 			array.push([start[0] - ((distanceX/count)*space), start[1] - ((distanceY/count)*space)]);
 		}
 
-		console.log(line);
-		console.log(array);
 		return array;
 	}, [line]);
 

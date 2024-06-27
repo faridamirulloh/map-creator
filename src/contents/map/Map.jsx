@@ -11,24 +11,27 @@ import './Map.scss';
 import { Path } from '../../components/path/Path';
 
 const toolButtons = [
-	{ key: MapTools.ORBIT, tooltip: `${MapTools.ORBIT.toLowerCase()} (Q)`, icon: <RetweetOutlined />},
-	{ key: MapTools.WALL, tooltip: `${MapTools.WALL.toLowerCase()} (W)`, icon: <AppstoreFilled />},
-	{ key: MapTools.PATH, tooltip: `${MapTools.PATH.toLowerCase()} (E)`, icon: <ArrowRightOutlined />},
-	{ key: MapTools.RESET, tooltip: `${MapTools.RESET.toLowerCase()} (R)`, icon: <RollbackOutlined />},
-	{ key: MapTools.UNDO, tooltip: `${MapTools.UNDO.toLowerCase()} (Ctrl + Z)`, icon: <UndoOutlined />},
-	{ key: MapTools.REDO, tooltip: `${MapTools.REDO.toLowerCase()} (Ctrl + Y)`, icon: <RedoOutlined />},
+	{ key: MapTools.ORBIT, tooltip: 'Orbit (Q)', icon: <RetweetOutlined />},
+	{ key: MapTools.WALL, tooltip: 'Wall (W)', icon: <AppstoreFilled />},
+	{ key: MapTools.PATH, tooltip: 'Path (E)', icon: <ArrowRightOutlined />},
+	{ key: MapTools.CLEAR, tooltip: 'Clear (R)', icon: <RollbackOutlined />},
+	{ key: MapTools.UNDO, tooltip: 'Undo (Ctrl + Z)', icon: <UndoOutlined />},
+	{ key: MapTools.REDO, tooltip: 'Redo (Ctrl + Y)', icon: <RedoOutlined />},
 ];
+
+const initWall = {id: -1, pos: [0, -1]};
+const initPath = {start: [0, 0], end: [1, 1]};
 
 function Map() {
 	const [selectedTool, selectTool] = useState(MapTools.ORBIT);
 	const [onHoldClick, setHoldClick] = useState(false);
-	const [histories, setHistories] = useState([{walls: [], paths: [], selected: false}]);
-	const [walls, setWalls] = useState([]);
-	const [paths, setPaths] = useState([]);
+	const [histories, setHistories] = useState([{walls: [initWall], paths: [initPath], selected: true}]);
+	const [walls, setWalls] = useState([initWall]);
+	const [paths, setPaths] = useState([initPath]);
 	const [selectedTile, selectTile] = useState();
 
 	const handleOnClickTools = (key) => {
-		if (key === MapTools.RESET) {
+		if (key === MapTools.CLEAR) {
 			setWalls([]);
 			setPaths([]);
 			selectTile();
@@ -69,7 +72,7 @@ function Map() {
 		case 'q': handleOnClickTools(MapTools.ORBIT); break;
 		case 'w': handleOnClickTools(MapTools.WALL); break;
 		case 'e': handleOnClickTools(MapTools.PATH); break;
-		case 'r': handleOnClickTools(MapTools.RESET); break;
+		case 'r': handleOnClickTools(MapTools.CLEAR); break;
 		default: break;
 		}
 
