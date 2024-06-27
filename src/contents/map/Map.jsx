@@ -86,7 +86,12 @@ function Map() {
 	};
 
 	const handleSetHistory = (_walls, _paths) => {
-		setHistories((lastState) => ([...lastState.map((state) => ({...state, selected: false})), {walls: _walls, paths: _paths, selected: true}]));
+		const lastHistories = [...histories];
+		const findIndex = lastHistories.findIndex((state) => state.selected);
+
+		if (findIndex < lastHistories.length - 1) lastHistories.splice(findIndex + 1);
+
+		setHistories([...lastHistories.map((state) => ({...state, selected: false})), {walls: _walls, paths: _paths, selected: true}]);
 	};
 
 	const handleOnHoverFloor = (_id, pos) => {
