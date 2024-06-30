@@ -5,12 +5,13 @@ import { RepeatWrapping, TextureLoader, Vector2, Vector3 } from 'three';
 import { useLayoutEffect, useRef } from 'react';
 import { MapTools, MarkType } from '../../constants/dataEnum';
 import { WallTextures } from '../../constants/textures';
+import Text from '../text/Text';
 
 const color = '/textures/red-shine.jpg';
 const pointHeight = 2;
 const wallHeight = 3;
 
-export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallTexture = WallTextures[0].source}) {
+export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallTexture = WallTextures[0].source, label = '', labelColor}) {
 	const colorMap = useLoader(TextureLoader, color);
 	const wallMap = useLoader(TextureLoader, wallTexture);
 	wallMap.repeat = new Vector2(1/2, wallHeight/2);
@@ -24,7 +25,8 @@ export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallText
 
 	const getObj = () => {
 		switch (type) {
-		case MarkType[MapTools.PATH]:
+		case MarkType[MapTools.MANUAL_PATH]:
+		case MarkType[MapTools.AUTO_PATH]:
 			return (
 				<>
 					<mesh position={[0, pointHeight, 0]}>
@@ -38,6 +40,7 @@ export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallText
 						<bufferGeometry />
 						<lineBasicMaterial color='yellow'/>
 					</line>
+					{label ? <Text label={label} position={[0, pointHeight + .5, 0]} color={labelColor} /> : null}
 				</>
 			);
 
@@ -67,4 +70,6 @@ HoverMark.propTypes = {
 	position: ArrayOfLength.bind(null, 3),
 	type: PropTypes.oneOf(Object.values(MarkType)),
 	wallTexture: PropTypes.oneOf(WallTextures.map(({source}) => source)),
+	label: PropTypes.string,
+	labelColor: PropTypes.string,
 };

@@ -1,8 +1,8 @@
 import { Vector3 } from 'three';
 
-export const calculateLength = (xA, yA, xB, yB) => {
-	const length = Math.sqrt((Math.pow(xA-xB, 2) + Math.pow(yA-yB, 2)));
-	return length;
+export const calculateDistance = (xA, yA, xB, yB) => {
+	const distance = Math.sqrt((Math.pow(xA-xB, 2) + Math.pow(yA-yB, 2)));
+	return distance;
 };
 
 export const calculateAngleRad = (xA, yA, xB, yB) => {

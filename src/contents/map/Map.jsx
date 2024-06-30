@@ -3,8 +3,8 @@ import { OrbitControls } from '@react-three/drei';
 import { FloorGrid } from '../../components/floorGrid/FloorGrid';
 import { Suspense, useState } from 'react';
 import { Button, Dropdown, Tooltip } from 'antd';
-import { AppstoreFilled, ArrowRightOutlined, DownOutlined, RedoOutlined, RetweetOutlined, RollbackOutlined, UndoOutlined } from '@ant-design/icons';
-import { MapTools } from '../../constants/dataEnum';
+import { AppstoreFilled, DownOutlined, NodeIndexOutlined, RedoOutlined, RetweetOutlined, RiseOutlined, RollbackOutlined, UndoOutlined } from '@ant-design/icons';
+import { MapTools, PointType } from '../../constants/dataEnum';
 import { Wall } from '../../components/wall/Wall';
 
 import './Map.scss';
@@ -12,13 +12,17 @@ import { Path } from '../../components/path/Path';
 import { FloorTextures, WallTextures } from '../../constants/textures';
 import { isEqual } from 'lodash';
 import { HoverMark } from '../../components/hoverMark/HoverMark';
-import { isWrongPath } from '../../stores/businesses/pathingBusinesses';
+import { generatePath, isInvalidLine } from '../../stores/businesses/pathingBusinesses';
 import { WallPreset1 } from '../../constants/presetWalls';
+import delay from '../../libs/delay';
+
+const mapSize = {width: 50, length: 30};
 
 const toolButtons = [
 	{ key: MapTools.ORBIT, tooltip: 'Orbit (Q)', icon: <RetweetOutlined />},
 	{ key: MapTools.WALL, tooltip: 'Wall (W)', icon: <AppstoreFilled />},
-	{ key: MapTools.PATH, tooltip: 'Manual Path (E)', icon: <ArrowRightOutlined />},
+	{ key: MapTools.MANUAL_PATH, tooltip: 'Manual Path (E)', icon: <RiseOutlined />},
+	{ key: MapTools.AUTO_PATH, tooltip: 'Auto Path (Shift + E)', icon: <NodeIndexOutlined />},
 	{ key: MapTools.CLEAR, tooltip: 'Clear (R)', icon: <RollbackOutlined />},
 	{ key: MapTools.UNDO, tooltip: 'Undo (Ctrl + Z)', icon: <UndoOutlined />},
 	{ key: MapTools.REDO, tooltip: 'Redo (Ctrl + Y)', icon: <RedoOutlined />},
@@ -53,14 +57,26 @@ function Map() {
 		),
 	}));
 
-	const showHoverMark = hoverPos && !holdPos && (selectedTool === MapTools.WALL || selectedTool === MapTools.PATH);
-	const isCreatingWall = selectedTool === MapTools.WALL && holdPos && hoverPos && holdPos[1] === hoverPos[1];
-	const isCreatingPath = selectedTool === MapTools.PATH && holdPos && hoverPos;
+	const showSource = selectedTool === MapTools.AUTO_PATH && holdPos;
+	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
+	let hoverMarkLabel, hoverMarkLabelColor;
+	if (showHoverMark && selectedTool === MapTools.AUTO_PATH) {
+		if (!holdPos) {
+			hoverMarkLabel = PointType.SOURCE;
+			hoverMarkLabelColor = 'green';
+		} else {
+			hoverMarkLabel = PointType.DESTINATION;
+			hoverMarkLabelColor = 'red';
+		}
+	}
 
-	let wrongPath;
+	const isCreatingWall = selectedTool === MapTools.WALL && holdPos && hoverPos && holdPos[1] === hoverPos[1];
+	const isCreatingPath = selectedTool === MapTools.MANUAL_PATH && holdPos && hoverPos;
+
+	let invalidLine;
 	if ((isCreatingPath || isCreatingWall) && holdPos[1] === hoverPos[1]) {
 		const obstacles = isCreatingPath ? walls : paths;
-		wrongPath = isWrongPath(holdPos, hoverPos, obstacles.filter(({y}) => y === holdPos[1]));
+		invalidLine = isInvalidLine([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], obstacles.filter(({y}) => y === holdPos[1]));
 	}
 
 	const updateHistory = (_walls, _paths) => {
@@ -119,7 +135,7 @@ function Map() {
 		switch (e.key.toLowerCase()) {
 		case 'q': handleOnClickTools(MapTools.ORBIT); break;
 		case 'w': handleOnClickTools(MapTools.WALL); break;
-		case 'e': handleOnClickTools(MapTools.PATH); break;
+		case 'e': handleOnClickTools(e.shiftKey? MapTools.AUTO_PATH : MapTools.MANUAL_PATH); break;
 		case 'r': handleOnClickTools(MapTools.CLEAR); break;
 		case 'escape': setHoldPos(); break;
 		default: break;
@@ -136,11 +152,11 @@ function Map() {
 
 	const createWall = () => {
 		const [startX, startY, startZ] = holdPos;
-		const [endtX, endtY, endtZ] = hoverPos;
+		const [endX, endY, endZ] = hoverPos;
 
-		if (startY === endtY && !wrongPath) {
+		if (startY === endY && !invalidLine) {
 			const newId = walls.length > 0 ? walls[walls.length - 1].id + 1 : 1;
-			const newWalls = [...walls, {id: newId, y: startY, start: [startX, startZ], end: [endtX, endtZ]}];
+			const newWalls = [...walls, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
 			setWalls(newWalls);
 			updateHistory(newWalls, paths);
 			setHoldPos(hoverPos);
@@ -149,35 +165,59 @@ function Map() {
 
 	const createPath = () => {
 		const [startX, startY, startZ] = holdPos;
-		const [endtX, endtY, endtZ] = hoverPos;
+		const [endX, endY, endZ] = hoverPos;
 
-		if (startY === endtY && !wrongPath) {
+		if (startY === endY && !invalidLine) {
 			const newId = paths.length > 0 ? paths[paths.length - 1].id + 1 : 1;
-			const newPaths = [...paths, {id: newId, y: startY, start: [startX, startZ], end: [endtX, endtZ]}];
+			const newPaths = [...paths, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
 			setPaths(newPaths);
 			updateHistory(walls, newPaths);
 			setHoldPos(hoverPos);
 		}
 	};
 
+	const createAutoPath = async () => {
+		const path = generatePath([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], walls, mapSize);
+		const y = holdPos[1];
+		const newPaths = [];
+		let prevPoint = [path[0].x, path[0].z];
+		let currentPoint = [path[1].x, path[1].z];
+
+		path.forEach(({x, z}, i) => {
+			if (i > 1 && isInvalidLine(prevPoint, [x, z], walls)) {
+				newPaths.push({id: i, y, start: prevPoint, end: currentPoint});
+				prevPoint = currentPoint;
+			}
+
+			currentPoint = [x, z];
+
+			if (i === path.length - 1) newPaths.push({id: i, y, start: prevPoint, end: currentPoint});
+		});
+
+		setPaths([]);
+		await delay(10);
+		setPaths(newPaths);
+	};
+
 	const createObject = () => {
 		switch (selectedTool) {
 		case MapTools.WALL: createWall(); break;
-		case MapTools.PATH: createPath(); break;
+		case MapTools.MANUAL_PATH: createPath(); break;
+		case MapTools.AUTO_PATH: createAutoPath(); break;
 
 		default: break;
 		}
 	};
 
 	const handleOnClickFloor = (e) => {
-		if (e.button === 0 && (selectedTool === MapTools.WALL || selectedTool === MapTools.PATH)) {
+		if (e.button === 0 && (selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.AUTO_PATH)) {
 			if (holdPos) createObject();
 			else setHoldPos(hoverPos);
 		}
 	};
 
 	return (
-		<div className='map-container' tabIndex={0} onKeyDown={handleOnKeyDown}>
+		<div autoFocus className='map-container' tabIndex={0} onKeyDown={handleOnKeyDown}>
 			<Canvas
 				camera={{fov: 50, position: [25, 10, 30]}}
 				// onPointerDown={() => setHoldClick(true)}
@@ -186,17 +226,34 @@ function Map() {
 				<ambientLight intensity={1.2} />
 				<Suspense fallback={undefined}>
 					<FloorGrid
-						size={{width: 50, length: 30}}
+						size={mapSize}
 						textureSource={floorTexture}
 						onHover={handleOnHoverFloor}
 						onPointerDown={handleOnClickFloor}
 					/>
-					{isCreatingWall ? <Wall y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} textureSource={wallTexture} error={wrongPath} /> : null}
-					{isCreatingPath ? <Path y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} error={wrongPath} /> : null}
+
+					{ isCreatingWall
+						? <Wall y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} textureSource={wallTexture} error={invalidLine} />
+						: null
+					}
+
+					{ isCreatingPath
+						? <Path y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} error={invalidLine} />
+						: null
+					}
+
 					{walls.map((wall) => <Wall key={wall.id} textureSource={wallTexture} {...wall} />)}
 					{paths.map((path) => <Path key={path.id} {...path} />)}
 
-					{showHoverMark ? <HoverMark position={hoverPos} type={selectedTool} wallTexture={wallTexture} /> : null}
+					{ showSource
+						? <HoverMark position={holdPos} type={selectedTool} label={PointType.SOURCE} labelColor='green' />
+						: null
+					}
+					{ showHoverMark
+						? <HoverMark position={hoverPos} type={selectedTool} wallTexture={wallTexture} label={hoverMarkLabel} labelColor={hoverMarkLabelColor} />
+						: null
+					}
+
 				</Suspense>
 				<OrbitControls
 					makeDefault

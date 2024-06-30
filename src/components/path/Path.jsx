@@ -28,7 +28,7 @@ Dot.propTypes = {
 	position: ArrayOfLength.bind(null, 2),
 };
 
-export function Path({y = 0, start = [0, 0], end = [5, 5], error = false}) {
+export function Path({y = 0, start = [0, 0], end = [0, 0], error = false}) {
 	const lineRef = useRef();
 
 	useLayoutEffect(() => {
