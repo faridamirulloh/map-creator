@@ -1,45 +1,43 @@
-import { useLoader } from '@react-three/fiber';
-import { TextureLoader } from 'three';
+import PropTypes from 'prop-types';
+import { RepeatWrapping, TextureLoader, Vector2 } from 'three';
 import { ArrayOfLength } from '../../libs/customPropTypes';
-import { IS_DEV } from '../../constants/constant';
-
-const name = (type) => `.${IS_DEV? '/public' : ''}/textures/paving-stones-${type}.jpg`;
-const stone = `.${IS_DEV? '/public' : ''}/textures/stone.jpg`;
+import { WallTextures } from '../../constants/textures';
+import { calculateAngleRad, calculateLength, calculatePosition } from '../../libs/calcHelper';
+import { useLayoutEffect, useMemo } from 'react';
 
 const wallHeight = 3;
 
-export function Wall({position = [0, 0]}) {
-	const [
-		colorMap,
-		displacementMap,
-		normalMap,
-		roughnessMap,
-		aoMap,
-	] = useLoader(TextureLoader, [
-		name('color'),
-		name('displacement'),
-		name('normal'),
-		name('roughness'),
-		name('ambientOcclusion'),
-	]);
+export function Wall({y = 0, start = [0, 0], end = [10, 10], textureSource = WallTextures[0].source, error = false}) {
+	const wallLength = calculateLength(...start, ...end);
 
-	const stoneColor = useLoader(TextureLoader, stone);
+	const textureMap = useMemo(() => {
+		const txtLoader = new TextureLoader();
+		const result = txtLoader.load(textureSource);
+		result.wrapS = RepeatWrapping;
+		result.wrapT = RepeatWrapping;
+
+		return result;
+	}, [textureSource]);
+
+	useLayoutEffect(() => {
+		textureMap.repeat = new Vector2(wallLength/2, wallHeight/2);
+	}, [textureMap, wallLength]);
 
 	return (
-		<mesh position={[position[0], wallHeight / 2, position[1]]}>
-			<boxGeometry args={[1, wallHeight, 1]} />
-			<meshStandardMaterial
-				displacementScale={0}
-				map={stoneColor}
-				// displacementMap={displacementMap}
-				// normalMap={normalMap}
-				// roughnessMap={roughnessMap}
-				// aoMap={aoMap}
-			/>
+		<mesh position={calculatePosition(start[0], y, start[1], end[0], y+wallHeight, end[1])} rotation={[0, calculateAngleRad(...start, ...end), 0]} >
+			<boxGeometry args={[calculateLength(...start, ...end), wallHeight, 1]} />
+			{ error
+				? <meshBasicMaterial color='red' />
+				: <meshStandardMaterial displacementScale={0} map={textureMap} />
+			}
 		</mesh>
 	);
 }
 
 Wall.propTypes = {
-	position: ArrayOfLength.bind(null, 2),
+	y: PropTypes.number,
+	start: ArrayOfLength.bind(null, 2),
+	end: ArrayOfLength.bind(null, 2),
+	textureSource: PropTypes.oneOf(WallTextures.map(({source}) => source)),
+	error: PropTypes.bool,
 };

@@ -1,69 +1,59 @@
-import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { DoubleSide } from 'three/src/constants.js';
+import { RepeatWrapping } from 'three/src/constants.js';
 import { Bounds } from '@react-three/drei';
+import { useLoader } from '@react-three/fiber';
+import { TextureLoader, Vector2 } from 'three';
+import { FloorTextures } from '../../constants/textures';
 
-const defaultColor = 0x4CBEE4;
-const hoverColor = 0xDEE64C;
-const selectedColor = 0xE44C4C;
+const floorTick = 1;
 
 export function FloorGrid({
+	textureSource = FloorTextures[0].source,
 	size = {width: 1, length: 1},
-	selectedTile = null,
 	onHover = () => {},
 	onPointerDown = () => {},
 }) {
-	const [hoverId, setHoverId] = useState();
+	const textureMap = useLoader(TextureLoader, textureSource);
+	textureMap.repeat = new Vector2(size.width/7, size.length/7);
+	textureMap.wrapS = RepeatWrapping;
+	textureMap.wrapT = RepeatWrapping;
 
-	const grid = useMemo(() => {
-		const result = [];
+	const handlePointerMove = (e) => {
+		try {
+			const {x, y, z} = e.intersections[0].point;
+			const point = {
+				x: Number(x.toFixed(0)),
+				y: Number(y.toFixed(0)),
+				z: Number(z.toFixed(0)),
+			};
 
-		for (let x = 1; x < size.width; x++) {
-			for (let y = 0; y < size.length; y++) {
-				result.push([x, 0, -y]);
-			}
+			onHover([point.x, point.y, point.z]);
+		} catch (error) {
+			console.error(error);
 		}
-
-		return result;
-	}, [size.length, size.width]);
-
-	const handleOnPointerEnter = (id, pos) => {
-		setHoverId(id);
-		onHover(id, pos);
 	};
 
-	return grid.length > 0 ? (
-		<>
-			<Bounds fit clip observe margin={0.9}>
-				{/* <mesh
-					position={[-1, 0, -1]}
-					rotation={[-Math.PI / 2, 0, 0]}
-				>
-					<planeGeometry args={[.9, .9]}/>
-					<meshBasicMaterial color={hoverColor} />
-				</mesh> */}
-				{grid.map((pos, id) => (
-					<mesh
-						key={id}
-						position={pos}
-						rotation={[-Math.PI / 2, 0, 0]}
-						onPointerEnter={() => handleOnPointerEnter(id, [pos[0], pos[2]])}
-						onPointerLeave={() => setHoverId()}
-						onPointerDown={() => onPointerDown(id, [pos[0], pos[2]])}
-					>
-						<planeGeometry args={[.9, .9]}/>
-						<meshBasicMaterial
-							color={hoverId === id ? hoverColor : selectedTile === id ? selectedColor : defaultColor}
-							side={DoubleSide}
-						/>
-					</mesh>
-				))}
-			</Bounds>
-		</>
-	) : null;
+	return (
+		<Bounds fit clip observe margin={0.9}>
+			<mesh
+				position={[size.width/2, -floorTick/2, size.length/2]}
+				// onPointerEnter={() => handleOnPointerEnter(id, [pos[0], pos[2]])}
+				onPointerLeave={() => onHover()}
+				onPointerDown={onPointerDown}
+				onPointerMove={handlePointerMove}
+			>
+				<boxGeometry args={[size.width, 1, size.length]} />
+				<meshStandardMaterial
+					displacementScale={0}
+					map={textureMap}
+				/>
+			</mesh>
+		</Bounds>
+	);
 }
 
 FloorGrid.propTypes= {
+	textureSource: PropTypes.oneOf(FloorTextures.map(({source}) => source)),
 	size: PropTypes.shape({width: PropTypes.number, length: PropTypes.number}),
 	selectedTile: PropTypes.number,
 	onHover: PropTypes.func,
