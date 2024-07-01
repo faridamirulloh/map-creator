@@ -1,6 +1,7 @@
 export const MapTools = {
 	ORBIT: 'ORBIT',
 	WALL: 'WALL',
+	POINT: 'POINT',
 	MANUAL_PATH: 'MANUAL_PATH',
 	AUTO_PATH: 'AUTO_PATH',
 	CLEAR: 'CLEAR',
@@ -10,6 +11,7 @@ export const MapTools = {
 
 export const MarkType = {
 	[MapTools.WALL]: MapTools.WALL,
+	[MapTools.POINT]: MapTools.POINT,
 	[MapTools.MANUAL_PATH]: MapTools.MANUAL_PATH,
 	[MapTools.AUTO_PATH]: MapTools.AUTO_PATH,
 };

@@ -27,6 +27,7 @@ export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallText
 		switch (type) {
 		case MarkType[MapTools.MANUAL_PATH]:
 		case MarkType[MapTools.AUTO_PATH]:
+		case MarkType[MapTools.POINT]:
 			return (
 				<>
 					<mesh position={[0, pointHeight, 0]}>

@@ -28,6 +28,25 @@ Dot.propTypes = {
 	position: ArrayOfLength.bind(null, 2),
 };
 
+export function Point({position = [0, 0, 0]}) {
+	const colorMap = useLoader(TextureLoader, color);
+	const objRef = useRef();
+
+	return (
+		<mesh ref={objRef} position={[position[0], position[1] + pathHeight, position[2]]}>
+			<sphereGeometry args={[.25, 50, 50]} />
+			<meshStandardMaterial
+				displacementScale={0}
+				map={colorMap}
+			/>
+		</mesh>
+	);
+}
+
+Point.propTypes = {
+	position: ArrayOfLength.bind(null, 3),
+};
+
 export function Path({y = 0, start = [0, 0], end = [0, 0], error = false}) {
 	const lineRef = useRef();
 

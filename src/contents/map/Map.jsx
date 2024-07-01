@@ -3,24 +3,26 @@ import { OrbitControls } from '@react-three/drei';
 import { FloorGrid } from '../../components/floorGrid/FloorGrid';
 import { Suspense, useState } from 'react';
 import { Button, Dropdown, Tooltip } from 'antd';
-import { AppstoreFilled, DownOutlined, NodeIndexOutlined, RedoOutlined, RetweetOutlined, RiseOutlined, RollbackOutlined, UndoOutlined } from '@ant-design/icons';
+import { AppstoreFilled, DownCircleOutlined, DownOutlined, NodeIndexOutlined, RedoOutlined, RetweetOutlined, RiseOutlined, RollbackOutlined, UndoOutlined } from '@ant-design/icons';
 import { MapTools, PointType } from '../../constants/dataEnum';
 import { Wall } from '../../components/wall/Wall';
 
 import './Map.scss';
-import { Path } from '../../components/path/Path';
+import { Path, Point } from '../../components/path/Path';
 import { FloorTextures, WallTextures } from '../../constants/textures';
 import { isEqual } from 'lodash';
 import { HoverMark } from '../../components/hoverMark/HoverMark';
 import { generatePath, isInvalidLine } from '../../stores/businesses/pathingBusinesses';
-import { WallPreset1 } from '../../constants/presetWalls';
+import { WallPreset1, WallPreset2 } from '../../constants/presetWalls';
 import delay from '../../libs/delay';
+import { PointsPreset2 } from '../../constants/presetPoints';
 
 const mapSize = {width: 50, length: 30};
 
 const toolButtons = [
 	{ key: MapTools.ORBIT, tooltip: 'Orbit (Q)', icon: <RetweetOutlined />},
 	{ key: MapTools.WALL, tooltip: 'Wall (W)', icon: <AppstoreFilled />},
+	{ key: MapTools.POINT, tooltip: 'Point (P)', icon: <DownCircleOutlined />},
 	{ key: MapTools.MANUAL_PATH, tooltip: 'Manual Path (E)', icon: <RiseOutlined />},
 	{ key: MapTools.AUTO_PATH, tooltip: 'Auto Path (Shift + E)', icon: <NodeIndexOutlined />},
 	{ key: MapTools.CLEAR, tooltip: 'Clear (R)', icon: <RollbackOutlined />},
@@ -28,13 +30,19 @@ const toolButtons = [
 	{ key: MapTools.REDO, tooltip: 'Redo (Ctrl + Y)', icon: <RedoOutlined />},
 ];
 
+const clearButtons = {
+	walls: 'walls',
+	points: 'points',
+	paths: 'paths',
+};
+
 function Map() {
 	const [floorTexture, setFloorTexture] = useState(FloorTextures[0].source);
 	const [wallTexture, setWallTexture] = useState(WallTextures[0].source);
 	const [selectedTool, selectTool] = useState(MapTools.ORBIT);
-	// const [onHoldClick, setHoldClick] = useState(false);
-	const [histories, setHistories] = useState([{walls: [WallPreset1], paths: [], selected: true}]);
-	const [walls, setWalls] = useState(WallPreset1);
+	const [histories, setHistories] = useState([{walls: [WallPreset2], paths: [], points: [PointsPreset2], selected: true}]);
+	const [walls, setWalls] = useState(WallPreset2);
+	const [points, setPoints] = useState(PointsPreset2);
 	const [paths, setPaths] = useState([]);
 	const [holdPos, setHoldPos] = useState();
 	const [hoverPos, setHoverPos] = useState();
@@ -58,7 +66,7 @@ function Map() {
 	}));
 
 	const showSource = selectedTool === MapTools.AUTO_PATH && holdPos;
-	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
+	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.POINT) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
 	let hoverMarkLabel, hoverMarkLabelColor;
 	if (showHoverMark && selectedTool === MapTools.AUTO_PATH) {
 		if (!holdPos) {
@@ -79,14 +87,55 @@ function Map() {
 		invalidLine = isInvalidLine([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], obstacles.filter(({y}) => y === holdPos[1]));
 	}
 
-	const updateHistory = (_walls, _paths) => {
+	const updateHistory = (_walls, _paths, _points) => {
 		const lastHistories = [...histories];
 		const findIndex = lastHistories.findIndex((state) => state.selected);
 
 		if (findIndex < lastHistories.length - 1) lastHistories.splice(findIndex + 1);
 
-		setHistories([...lastHistories.map((state) => ({...state, selected: false})), {walls: _walls, paths: _paths, selected: true}]);
+		setHistories([...lastHistories.map((state) => ({...state, selected: false})), {walls: _walls, paths: _paths, points: _points, selected: true}]);
 	};
+
+	const updateWalls = (_walls) => {
+		setWalls(_walls);
+		updateHistory(_walls, paths, points);
+	};
+
+	const updatePoints = (_points) => {
+		setPoints(_points);
+		updateHistory(walls, paths, _points);
+	};
+
+	const updatePaths = (_paths) => {
+		setPaths(_paths);
+		updateHistory(walls, _paths, points);
+	};
+
+	const clearMap = () => {
+		setWalls([]);
+		setPoints([]);
+		setPaths([]);
+		updateHistory([], [], []);
+	};
+
+	const handleClearItem = (item) => {
+		switch (item) {
+		case clearButtons.walls: updateWalls([]); break;
+		case clearButtons.points: updatePoints([]); break;
+		case clearButtons.paths: updatePaths([]); break;
+
+		default: break;
+		}
+	};
+
+	const clearItems = Object.values(clearButtons).map((item) => ({
+		key: item,
+		label: (
+			<Button block type='default' onClick={() => handleClearItem(item)} >
+				{item}
+			</Button>
+		),
+	}));
 
 	const handleOnHoverFloor = (pos) => {
 		if (!isEqual(pos, hoverPos)) setHoverPos(pos);
@@ -94,9 +143,7 @@ function Map() {
 
 	const handleOnClickTools = (key) => {
 		if (key === MapTools.CLEAR) {
-			setWalls([]);
-			setPaths([]);
-			updateHistory([], []);
+			clearMap();
 		} else if (key === MapTools.UNDO) {
 			const findIndex = histories.findIndex((state) => state.selected);
 
@@ -107,6 +154,7 @@ function Map() {
 				newHistories[newIndex].selected = true;
 
 				setWalls(newHistories[newIndex].walls);
+				setPoints(newHistories[newIndex].points);
 				setPaths(newHistories[newIndex].paths);
 				setHistories(newHistories);
 			}
@@ -120,6 +168,7 @@ function Map() {
 				newHistories[newIndex].selected = true;
 
 				setWalls(newHistories[newIndex].walls);
+				setPoints(newHistories[newIndex].points);
 				setPaths(newHistories[newIndex].paths);
 				setHistories(newHistories);
 			}
@@ -137,6 +186,7 @@ function Map() {
 		case 'w': handleOnClickTools(MapTools.WALL); break;
 		case 'e': handleOnClickTools(e.shiftKey? MapTools.AUTO_PATH : MapTools.MANUAL_PATH); break;
 		case 'r': handleOnClickTools(MapTools.CLEAR); break;
+		case 'p': handleOnClickTools(MapTools.POINT); break;
 		case 'escape': setHoldPos(); break;
 		default: break;
 		}
@@ -157,8 +207,7 @@ function Map() {
 		if (startY === endY && !invalidLine) {
 			const newId = walls.length > 0 ? walls[walls.length - 1].id + 1 : 1;
 			const newWalls = [...walls, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
-			setWalls(newWalls);
-			updateHistory(newWalls, paths);
+			updateWalls(newWalls);
 			setHoldPos(hoverPos);
 		}
 	};
@@ -170,33 +219,27 @@ function Map() {
 		if (startY === endY && !invalidLine) {
 			const newId = paths.length > 0 ? paths[paths.length - 1].id + 1 : 1;
 			const newPaths = [...paths, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
-			setPaths(newPaths);
-			updateHistory(walls, newPaths);
+			updatePaths(newPaths);
 			setHoldPos(hoverPos);
 		}
 	};
 
-	const createAutoPath = async () => {
-		const path = generatePath([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], walls, mapSize);
+	const createAutoPath = () => {
+		const path = generatePath(holdPos, hoverPos, [...points, hoverPos], walls);
 		const y = holdPos[1];
 		const newPaths = [];
-		let prevPoint = [path[0].x, path[0].z];
-		let currentPoint = [path[1].x, path[1].z];
 
-		path.forEach(({x, z}, i) => {
-			if (i > 1 && isInvalidLine(prevPoint, [x, z], walls)) {
-				newPaths.push({id: i, y, start: prevPoint, end: currentPoint});
-				prevPoint = currentPoint;
+		path.forEach(({pos}, i) => {
+			if (i > 0) {
+				const start = [path[i-1].pos[0], path[i-1].pos[2]];
+				const end = [pos[0], pos[2]];
+
+				newPaths.push({id: i, y, start, end});
 			}
-
-			currentPoint = [x, z];
-
-			if (i === path.length - 1) newPaths.push({id: i, y, start: prevPoint, end: currentPoint});
 		});
 
-		setPaths([]);
-		await delay(10);
-		setPaths(newPaths);
+		updatePaths(newPaths);
+		setHoldPos();
 	};
 
 	const createObject = () => {
@@ -210,9 +253,13 @@ function Map() {
 	};
 
 	const handleOnClickFloor = (e) => {
-		if (e.button === 0 && (selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.AUTO_PATH)) {
-			if (holdPos) createObject();
-			else setHoldPos(hoverPos);
+		if (e.button === 0) {
+			if ((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.AUTO_PATH)) {
+				if (holdPos) createObject();
+				else setHoldPos(hoverPos);
+			} else if (selectedTool === MapTools.POINT) {
+				updatePoints([...points, hoverPos]);
+			}
 		}
 	};
 
@@ -244,6 +291,7 @@ function Map() {
 
 					{walls.map((wall) => <Wall key={wall.id} textureSource={wallTexture} {...wall} />)}
 					{paths.map((path) => <Path key={path.id} {...path} />)}
+					{points.map((point, i) => <Point key={i} position={point} />)}
 
 					{ showSource
 						? <HoverMark position={holdPos} type={selectedTool} label={PointType.SOURCE} labelColor='green' />
@@ -280,6 +328,11 @@ function Map() {
 				<Dropdown menu={{items: wallItems}} trigger={['click']} >
 					<Button type={'default'} icon={<DownOutlined />} iconPosition='end' >
 						Wall Textures
+					</Button>
+				</Dropdown>
+				<Dropdown menu={{items: clearItems}} trigger={['click']} >
+					<Button type={'default'} icon={<DownOutlined />} iconPosition='end' >
+						Clear Item
 					</Button>
 				</Dropdown>
 			</div>
