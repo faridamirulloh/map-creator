@@ -4,7 +4,6 @@ export const MapTools = {
 	POINT: 'POINT',
 	MANUAL_PATH: 'MANUAL_PATH',
 	AUTO_PATH: 'AUTO_PATH',
-	CLEAR: 'CLEAR',
 	UNDO: 'UNDO',
 	REDO: 'REDO',
 };
@@ -17,7 +16,26 @@ export const MarkType = {
 };
 
 export const PointType = {
-	SOURCE: 'SOURCE',
-	DESTINATION: 'DESTINATION',
+	DESTINATION: 'Destination',
+	PATH: 'Path',
+	POINT_GUIDE: 'Point Guide',
+	SOURCE: 'Source',
+	STAIR: 'Stair',
+};
+
+export const ObjectType = {
+	POINT: 'Point',
+	WALL: 'Wall',
+};
+
+export const ClearButtons = {
+	ALL: 'All',
+	WALLS: 'Walls',
+	POINTS: 'Points',
+	PATHS: 'Paths',
+};
+
+export const FloorType = {
+	FLAT: 'FLAT',
 	STAIR: 'STAIR',
 };

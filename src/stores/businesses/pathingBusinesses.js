@@ -1,5 +1,5 @@
 import { isEqual } from 'lodash';
-import { calculateDistance, doIntersect } from '../../libs/calcHelper';
+import { calculateDistance2D, calculateDistance3D, doIntersect } from '../../libs/calcHelper';
 
 export const isInvalidLine = (startPoint, endPoint, obstacles) => {
 	let invalid = false;
@@ -15,17 +15,31 @@ export const isInvalidLine = (startPoint, endPoint, obstacles) => {
 	return invalid;
 };
 
-const pointToId = (point) => `x${point[0]}z${point[1]}`;
+const isDifferentLevel = (yA, yB) => yA !== yB;
 
-const getNearestPathIndex = (paths, destination) => {
+const getNearestPathIndex = (paths = [], destination = [], stairs = []) => {
 	let index = null;
 	let nearestDistance = null;
 
 	paths.forEach((path, i) => {
-		const latestPoint = path[path.length - 1];
-		const distance = latestPoint.distance + calculateDistance(latestPoint.pos[0], latestPoint.pos[2], destination[0], destination[2]);
+		const lastPoint = path[path.length - 1];
+		let distance;
 
-		if (nearestDistance === null || nearestDistance > distance) {
+		if (isDifferentLevel(lastPoint.pos[1], destination[1])) {
+			stairs.forEach((stair) => {
+				distance = lastPoint.distance + stair.exit.distance
+					+ calculateDistance2D(lastPoint.pos[0], lastPoint.pos[2], stair.entrance.point[0], stair.entrance.point[2]);
+
+				if (nearestDistance === null || distance < nearestDistance) {
+					index = i;
+					nearestDistance = distance;
+				}
+			});
+		} else {
+			distance = lastPoint.distance + calculateDistance2D(lastPoint.pos[0], lastPoint.pos[2], destination[0], destination[2]);
+		}
+
+		if (nearestDistance === null || distance < nearestDistance) {
 			index = i;
 			nearestDistance = distance;
 		}
@@ -34,54 +48,95 @@ const getNearestPathIndex = (paths, destination) => {
 	return index;
 };
 
-const getNextPoints = (path, points, obsatcles) => {
+const findNextPoints = (path, points, obsatcles) => {
 	const nextPoints = [];
-	const latestPoint = path[path.length - 1];
+	const lastPoint = path[path.length - 1];
 
 	points.forEach((_pos) => {
-		if (!isInvalidLine([latestPoint.pos[0], latestPoint.pos[2]], [_pos[0], _pos[2]], obsatcles)
-		&& !path.find(({pos}) => isEqual(pos, _pos))
+		if (
+			!isDifferentLevel(lastPoint.pos[1], _pos[1])
+			&& !isInvalidLine([lastPoint.pos[0], lastPoint.pos[2]], [_pos[0], _pos[2]], obsatcles.filter(({y}) => y === lastPoint.pos[1]))
+			&& !path.find(({pos}) => isEqual(pos, _pos))
 		) {
-			nextPoints.push({ pos: _pos, distance: latestPoint.distance + calculateDistance(latestPoint.pos[0], latestPoint.pos[2], _pos[0], _pos[2]) });
+			nextPoints.push({ pos: _pos, distance: lastPoint.distance + calculateDistance2D(lastPoint.pos[0], lastPoint.pos[2], _pos[0], _pos[2]) });
 		}
 	});
 
 	return nextPoints;
 };
 
-export const generatePath = (source, destination, points, obsatcles) => {
+const doArrived = (paths, destination) => {
+	let result;
+
+	paths.forEach((path) => {
+		const lastPoint = path[path.length - 1];
+
+		if (isEqual(lastPoint.pos, destination)) result = path;
+	});
+
+	return result;
+};
+
+export const generatePath = (source = [], destination = [], points = [], obsatcles = [], stairsPoint = []) => {
+	const availablePoints = [...points, destination, ...stairsPoint.flat()];
 	const paths = [];
-	let currentPoint = {
-		pos: source,
-		distance: 0,
-	};
+	const stairs = [];
 
-	const getFinalPath = (paths) => {
-		let result;
-
-		paths.forEach((path) => {
-			const latestPoint = path[path.length - 1];
-
-			if (isEqual(latestPoint.pos, destination)) result = path;
-		});
-
-		return result;
-	};
-
-	points.forEach((pos) => {
-		if (!isInvalidLine([source[0], source[2]], [pos[0], pos[2]], obsatcles)
-		&& !isEqual(pos, source)
+	// init path, find possible paths
+	availablePoints.forEach((pos) => {
+		if (
+			!isDifferentLevel(source[1], pos[1])
+			&& !isInvalidLine([source[0], source[2]], [pos[0], pos[2]], obsatcles.filter(({y}) => y === source[1]))
+			&& !isEqual(pos, source)
 		) {
 			paths.push([
-				currentPoint,
-				{ pos, distance: calculateDistance(source[0], source[2], pos[0], pos[2]) },
+				{ pos: source, distance: 0 },
+				{ pos, distance: calculateDistance2D(source[0], source[2], pos[0], pos[2]) },
 			]);
 		}
 	});
 
-	while (!getFinalPath(paths)) {
-		const index = getNearestPathIndex(paths, destination);
-		const nextPoints = getNextPoints(paths[index], points, obsatcles);
+	if (isDifferentLevel(source[1], destination[1])) {
+		stairsPoint.forEach((points) => {
+			const entranceIndex = points.findIndex((point) => point[1] === source[1]);
+
+			if (entranceIndex >= 0){
+				const entrancePoint = points[entranceIndex];
+				const exitPoint = points[entranceIndex ? 0 : 1];
+
+				const stair = {
+					entrance: {
+						point: entrancePoint,
+						distance: calculateDistance2D(source[0], source[2], entrancePoint[0], entrancePoint[2]),
+					},
+					exit: {
+						point: exitPoint,
+						distance: calculateDistance2D(destination[0], destination[2], exitPoint[0], exitPoint[2]),
+					},
+					lengthDistance: calculateDistance3D(entrancePoint, exitPoint),
+				};
+
+				stairs.push(stair);
+			}
+		});
+	}
+
+	while (!doArrived(paths, destination)) {
+		const index = getNearestPathIndex(paths, destination, stairs);
+		const lastPoint = paths[index][paths[index].length - 1];
+
+		if (isDifferentLevel(lastPoint.pos[1], destination[1])) {
+			stairs.forEach((stair) => {
+				if (isEqual(stair.entrance.point, lastPoint.pos)) {
+					paths[index].push({
+						pos: stair.exit.point,
+						distance: lastPoint.distance + stair.lengthDistance,
+					});
+				}
+			});
+		}
+
+		const	nextPoints = findNextPoints(paths[index], availablePoints, obsatcles);
 
 		if (nextPoints.length === 0) {
 			paths.splice(index, 1);
@@ -94,13 +149,9 @@ export const generatePath = (source, destination, points, obsatcles) => {
 				} else {
 					paths.push([...currentPath, point]);
 				}
-
-				if (isEqual(point.pos, destination)) {
-					currentPoint = point;
-				}
 			});
 		}
 	}
 
-	return getFinalPath(paths);
+	return doArrived(paths, destination);
 };

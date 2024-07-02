@@ -2,14 +2,14 @@ import PropTypes from 'prop-types';
 import { RepeatWrapping, TextureLoader, Vector2 } from 'three';
 import { ArrayOfLength } from '../../libs/customPropTypes';
 import { WallTextures } from '../../constants/textures';
-import { calculateAngleRad, calculateDistance, calculatePosition } from '../../libs/calcHelper';
+import { calculateAngleRad, calculateDistance2D, calculatePosition } from '../../libs/calcHelper';
 import { useLayoutEffect, useMemo } from 'react';
 
-const wallTick = 0.3;
-const wallHeight = 3;
+const wallThick = 0.3;
+const wallHeight = 2;
 
 export function Wall({y = 0, start = [0, 0], end = [0, 0], textureSource = WallTextures[0].source, error = false}) {
-	const wallLength = calculateDistance(...start, ...end);
+	const wallLength = calculateDistance2D(...start, ...end);
 
 	const textureMap = useMemo(() => {
 		const txtLoader = new TextureLoader();
@@ -25,8 +25,8 @@ export function Wall({y = 0, start = [0, 0], end = [0, 0], textureSource = WallT
 	}, [textureMap, wallLength]);
 
 	return (
-		<mesh position={calculatePosition(start[0], y, start[1], end[0], y + wallHeight, end[1])} rotation={[0, calculateAngleRad(...start, ...end), 0]} >
-			<boxGeometry args={[calculateDistance(...start, ...end), wallHeight, wallTick]} />
+		<mesh position={calculatePosition([start[0], y, start[1]], [end[0], y + wallHeight, end[1]])} rotation={[0, calculateAngleRad(...start, ...end), 0]} >
+			<boxGeometry args={[calculateDistance2D(...start, ...end), wallHeight, wallThick]} />
 			{ error
 				? <meshBasicMaterial color='red' />
 				: <meshStandardMaterial displacementScale={0} map={textureMap} />

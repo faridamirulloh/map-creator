@@ -1,4 +1,30 @@
 .map-container {
   width: 100vw;
   height: 100vh;
+  
+  .tooltip-container {
+    z-index: 2;
+    position: absolute;
+    height: fit-content;
+    width: fit-content;
+    pointer-events: none;
+    background-color: papayawhip;
+    padding: 5px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 500;
+
+    .visualization-tooltip {
+      display: flex;
+      flex-direction: column;
+      
+      .visualization-tooltip-data {
+        display: flex;
+
+        :first-child {
+          width: 70px;
+        }
+      }
+    }
+  }
 }

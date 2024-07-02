@@ -1,7 +1,12 @@
 import { Vector3 } from 'three';
 
-export const calculateDistance = (xA, yA, xB, yB) => {
+export const calculateDistance2D = (xA, yA, xB, yB) => {
 	const distance = Math.sqrt((Math.pow(xA-xB, 2) + Math.pow(yA-yB, 2)));
+	return distance;
+};
+
+export const calculateDistance3D = ([xA, yA, zA], [xB, yB, zB]) => {
+	const distance = Math.sqrt((Math.pow(xA-xB, 2) + Math.pow(yA-yB, 2) + Math.pow(zA-zB, 2)));
 	return distance;
 };
 
@@ -10,7 +15,7 @@ export const calculateAngleRad = (xA, yA, xB, yB) => {
 	return -angle;
 };
 
-export const calculatePosition = (xA, yA, zA, xB, yB, zB) => {
+export const calculatePosition = ([xA, yA, zA], [xB, yB, zB]) => {
 	const position = new Vector3(xA + (xB - xA)/2, yA + (yB - yA)/2, zA + (zB - zA)/2);
 	return position;
 };
