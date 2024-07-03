@@ -1,27 +1,28 @@
 import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
 import { FloorGrid } from '../../components/floorGrid/FloorGrid';
-import { Suspense, useState } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { Button, Dropdown, Tooltip } from 'antd';
 import { AppstoreFilled, DownCircleOutlined, DownOutlined, NodeIndexOutlined, RedoOutlined, RetweetOutlined, RiseOutlined, UndoOutlined } from '@ant-design/icons';
-import { MapTools, PointType, ClearButtons, FloorType } from '../../constants/dataEnum';
+import { MapTools, PointType, ClearButtons, FloorType, ObjectType, ColorType } from '../../constants/dataEnum';
 import { Wall } from '../../components/wall/Wall';
 
 import './Map.scss';
 import { Path, Point } from '../../components/path/Path';
 import { FloorTextures, WallTextures } from '../../constants/textures';
-import { isEqual } from 'lodash';
+import { cloneDeep, isEqual } from 'lodash';
 import { HoverMark } from '../../components/hoverMark/HoverMark';
 import { generatePath, isInvalidLine } from '../../stores/businesses/pathingBusinesses';
 import { WallPreset1, WallPreset2 } from '../../constants/presetWalls';
 import { PointsPreset1, PointsPreset2 } from '../../constants/presetPoints';
 import { Stair } from '../../components/stair/Stair';
 import { StairWidth, MapSize, FloorsLevel, Stairs, StairsPoints } from '../../constants/constant';
+import { calculateDistance2D } from '../../libs/calcHelper';
 
 const toolButtons = [
 	{ key: MapTools.ORBIT, tooltip: 'Orbit (Q)', icon: <RetweetOutlined />},
 	{ key: MapTools.WALL, tooltip: 'Wall (W)', icon: <AppstoreFilled />},
-	{ key: MapTools.POINT, tooltip: 'Point (A)', icon: <DownCircleOutlined />},
+	{ key: MapTools.POINT, tooltip: 'Guide Point (A)', icon: <DownCircleOutlined />},
 	{ key: MapTools.MANUAL_PATH, tooltip: 'Manual Path (E)', icon: <RiseOutlined />},
 	{ key: MapTools.AUTO_PATH, tooltip: 'Auto Path (Shift + E)', icon: <NodeIndexOutlined />},
 	{ key: MapTools.UNDO, tooltip: 'Undo (Ctrl + Z)', icon: <UndoOutlined />},
@@ -41,8 +42,15 @@ function Map() {
 	const [paths, setPaths] = useState([]);
 	const [holdPos, setHoldPos] = useState();
 	const [holdFloor, setHoldFloor] = useState({type: '', id: ''});
+	const [sourcePos, setSourcePos] = useState();
 	const [hoverPos, setHoverPos] = useState();
 	const [hoverFloor, setHoverFloor] = useState({type: '', id: ''});
+	const [toolTipContent, setToolTipContent] = useState();
+	const [toolTipPos, setToolTipPos] = useState({});
+	const pathGroupId = useRef(0);
+	const showTooltip = useRef(false);
+	const tooltipData = useRef();
+	const tooltipRef = useRef();
 
 	const floorItems = FloorTextures.map((floor) => ({
 		key: floor.label,
@@ -62,24 +70,23 @@ function Map() {
 		),
 	}));
 
-	const showSource = selectedTool === MapTools.AUTO_PATH && holdPos;
 	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.POINT) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
 	let hoverMarkLabel, hoverMarkLabelColor;
 	if (showHoverMark && selectedTool === MapTools.AUTO_PATH) {
 		if (!holdPos) {
 			hoverMarkLabel = PointType.SOURCE;
-			hoverMarkLabelColor = 'green';
+			hoverMarkLabelColor = ColorType.SOURCE;
 		} else {
 			hoverMarkLabel = PointType.DESTINATION;
-			hoverMarkLabelColor = 'red';
+			hoverMarkLabelColor = ColorType.DESTINATION;
 		}
 	}
 
 	const isCreatingWall = selectedTool === MapTools.WALL && holdPos && hoverPos && holdPos[1] === hoverPos[1];
-	const isCreatingPath = selectedTool === MapTools.MANUAL_PATH && holdPos && hoverPos;
+	const isCreatingPath = (selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.AUTO_PATH) && holdPos && hoverPos;
 
 	let invalidLine = false;
-	if (isCreatingPath || (isCreatingWall && holdPos[1] === hoverPos[1])) {
+	if ((isCreatingPath && selectedTool === MapTools.MANUAL_PATH) || (isCreatingWall && holdPos[1] === hoverPos[1])) {
 		if (isCreatingPath && holdPos[1] !== hoverPos[1]) {
 			if (holdFloor.type !== FloorType.STAIR || hoverFloor.type !== FloorType.STAIR || holdFloor.id !== hoverFloor.id) {
 				invalidLine = true;
@@ -90,29 +97,29 @@ function Map() {
 		}
 	}
 
-	const updateHistory = (_walls, _paths, _points) => {
+	const updateHistory = useCallback((_walls, _paths, _points) => {
 		const lastHistories = [...histories];
 		const findIndex = lastHistories.findIndex((state) => state.selected);
 
 		if (findIndex < lastHistories.length -1) lastHistories.splice(findIndex + 1);
 
 		setHistories([...lastHistories.map((state) => ({...state, selected: false})), {walls: _walls, paths: _paths, points: _points, selected: true}]);
-	};
+	}, [histories]);
 
-	const updateWalls = (_walls) => {
+	const updateWalls = useCallback((_walls) => {
 		setWalls(_walls);
 		updateHistory(_walls, paths, points);
-	};
+	}, [paths, points, updateHistory]);
 
-	const updatePoints = (_points) => {
+	const updatePoints = useCallback((_points) => {
 		setPoints(_points);
 		updateHistory(walls, paths, _points);
-	};
+	}, [paths, updateHistory, walls]);
 
-	const updatePaths = (_paths) => {
+	const updatePaths = useCallback((_paths) => {
 		setPaths(_paths);
 		updateHistory(walls, _paths, points);
-	};
+	}, [points, updateHistory, walls]);
 
 	const clearMap = () => {
 		setWalls([]);
@@ -171,7 +178,7 @@ function Map() {
 				setHistories(newHistories);
 			}
 		} else {
-			if (key === selectedTool) selectTool();
+			if (key === selectedTool) selectTool(MapTools.ORBIT);
 			else selectTool(key);
 		}
 
@@ -197,58 +204,102 @@ function Map() {
 		}
 	};
 
-	const createWall = () => {
-		const [startX, startY, startZ] = holdPos;
-		const [endX, endY, endZ] = hoverPos;
-
-		if (startY === endY && !invalidLine) {
-			const newId = walls.length > 0 ? walls[walls.length -1].id + 1 : 1;
-			const newWalls = [...walls, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
-			updateWalls(newWalls);
-			setHoldPos(hoverPos);
-		}
-	};
-
-	const createPath = () => {
-		if (!invalidLine) {
-			const newId = paths.length > 0 ? paths[paths.length -1].id + 1 : 1;
-			const newPaths = [...paths, {id: newId, start: holdPos, end: hoverPos}];
-			updatePaths(newPaths);
-			setHoldPos(hoverPos);
-		}
-	};
-
-	const createAutoPath = () => {
-		console.log('Generating path...');
-		const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
-		const y = holdPos[1];
-		const newPaths = [];
-
-		path.forEach(({pos}, i) => {
-			if (i > 0) newPaths.push({id: i, y, start: path[i-1].pos, end: pos});
-		});
-
-		updatePaths(newPaths);
-		setHoldPos();
-	};
-
-	const createObject = () => {
-		switch (selectedTool) {
-		case MapTools.WALL: createWall(); break;
-		case MapTools.MANUAL_PATH: createPath(); break;
-		case MapTools.AUTO_PATH: createAutoPath(); break;
-
-		default: break;
-		}
-	};
-
-	const handleOnHoverFloor = (pos, floorType = FloorType.FLAT, id) => {
+	const handleOnHoverFloor = useCallback((pos, floorType = FloorType.FLAT, id) => {
 		if (!isEqual(pos, hoverPos)) setHoverPos(pos);
 		if (!isEqual({type: floorType, id}, hoverFloor)) setHoverFloor({type: floorType, id});
-	};
+	}, [hoverFloor, hoverPos]);
 
-	const handleOnClickFloor = (e, floorType = FloorType.FLAT, id) => {
+	const handleOnClickFloor = useCallback((e, floorType = FloorType.FLAT, id) => {
 		if (e.button === 0) {
+			const createWall = () => {
+				const [startX, startY, startZ] = holdPos;
+				const [endX, endY, endZ] = hoverPos;
+
+				if (startY === endY && !invalidLine) {
+					const newId = walls.length > 0 ? walls[walls.length -1].id + 1 : 1;
+					const newWalls = [...walls, {id: newId, y: startY, start: [startX, startZ], end: [endX, endZ]}];
+					updateWalls(newWalls);
+					setHoldPos(hoverPos);
+				}
+			};
+
+			const createPath = () => {
+				if (!invalidLine) {
+					const newPaths = cloneDeep(paths);
+					const lastPath = newPaths[newPaths.length -1];
+					const newId = newPaths.length > 0 ? lastPath.id + 1 : 1;
+					let type = PointType.DESTINATION;
+
+					// if (!lastPath || lastPath?.groupId !== pathGroupId.current) type = PointType.SOURCE;
+					if (lastPath && lastPath?.groupId === pathGroupId.current && lastPath.type !== PointType.SOURCE) lastPath.type = PointType.DIRECTION;
+
+					const	distance = (type === PointType.DESTINATION ? lastPath?.distance || 0 : 0) + calculateDistance2D(holdPos[0], holdPos[2], hoverPos[0], hoverPos[2]);
+
+					newPaths.push({
+						id: newId,
+						groupId: pathGroupId.current,
+						type,
+						start: holdPos,
+						end: hoverPos,
+						distance: Number(distance.toFixed(1)),
+					});
+
+					updatePaths(newPaths);
+					setHoldPos(hoverPos);
+				}
+			};
+
+			const createAutoPath = () => {
+				console.log('Generating Path...');
+				const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
+				const y = holdPos[1];
+				const newPaths = [];
+				pathGroupId.current += 1;
+
+				path.forEach(({pos, distance}, i) => {
+					if (i > 0) {
+						newPaths.push({
+							id: i, y,
+							start: path[i-1].pos,
+							end: pos,
+							groupId: pathGroupId.current,
+							type: i === path.length -1 ? PointType.DESTINATION : PointType.DIRECTION,
+							distance: Number(distance.toFixed(1)),
+						});
+					}
+				});
+
+				updatePaths([...paths, ...newPaths]);
+				setHoldPos();
+				console.log('Path Found!');
+			};
+
+			const initiateObject = () => {
+				setHoldPos(hoverPos);
+
+				switch (selectedTool) {
+				case MapTools.MANUAL_PATH:
+					pathGroupId.current = (paths[paths.length - 1]?.groupId || 0) +1;
+				// eslint-disable-next-line no-fallthrough
+				case MapTools.AUTO_PATH:
+					setSourcePos(hoverPos);
+					break;
+
+				default:
+					break;
+				}
+			};
+
+			const createObject = () => {
+				switch (selectedTool) {
+				case MapTools.WALL: createWall(); break;
+				case MapTools.MANUAL_PATH: createPath(); break;
+				case MapTools.AUTO_PATH: createAutoPath(); break;
+
+				default: break;
+				}
+			};
+
 			switch (selectedTool) {
 			case MapTools.MANUAL_PATH:
 				if (!isEqual({type: floorType, id}, holdFloor)) setHoldFloor({type: floorType, id});
@@ -256,7 +307,7 @@ function Map() {
 			case MapTools.WALL:
 			case MapTools.AUTO_PATH:
 				if (holdPos) createObject();
-				else setHoldPos(hoverPos);
+				else initiateObject();
 				break;
 
 			case MapTools.POINT:
@@ -266,28 +317,257 @@ function Map() {
 			default: break;
 			}
 		}
-	};
+	}, [holdFloor, holdPos, hoverPos, invalidLine, paths, points, selectedTool, updatePaths, updatePoints, updateWalls, walls]);
+
+	const handleChangeTooltipContent = useCallback((e) => {
+		let content = null;
+		let data;
+
+		const handleChangeTooltipPos = ({clientX, clientY}) => {
+			const pos = {visibility: 'visible'};
+			const {offsetHeight: vh, offsetWidth: vw} = document.body;
+			const {offsetHeight: tooltipHeight, offsetWidth: tooltipWidth} = tooltipRef.current;
+
+			if (clientX < vw - (tooltipWidth + 6)) pos.left = clientX + 5;
+			else pos.right = vw - clientX + 5;
+
+			if (clientY > tooltipHeight + 6) pos.bottom = vh - clientY + 5;
+			else pos.top = clientY + 5;
+
+			if (!isEqual(pos, toolTipPos)) setToolTipPos(pos);
+		};
+
+		const handleHideTooltip = () => {
+			const pos = {visibility: 'hidden'};
+			if (!isEqual(pos, toolTipPos)) setToolTipPos(pos);
+		};
+
+		if (selectedTool === MapTools.ORBIT && e?.intersections.length > 0) {
+			const {name, userData} = e.intersections[0].eventObject;
+			data = userData;
+
+			switch (name) {
+			case PointType.POINT_GUIDE:
+				content = (
+					<>
+						<div className='tooltip-label'>
+							Name
+							<br />
+							Pos
+						</div>
+						<div className='tooltip-value'>
+							: {name}
+							<br />
+							: [ {userData} ]
+						</div>
+					</>
+				);
+				break;
+			case ObjectType.WALL:
+				content = (
+					<>
+						<div className='tooltip-label'>
+							Name
+							<br />
+							Length
+							<br />
+							Start Pos
+							<br />
+							End Pos
+							<br />
+							Y
+						</div>
+						<div className='tooltip-value'>
+							: {name}
+							<br />
+							: {calculateDistance2D(...userData.start, ...userData.end)}
+							<br />
+							: [ {userData.start.join(', ')} ]
+							<br />
+							: ({userData.end.join(', ')})
+							<br />
+							: {userData.y}
+						</div>
+					</>
+				);
+				break;
+			case PointType.PATH:
+				content = (
+					<>
+						<div className='tooltip-label'>
+							Name
+							<br />
+							Type
+							<br />
+							Path Id
+							<br />
+							Pos
+							<br />
+							Distance
+						</div>
+						<div className='tooltip-value'>
+							: {name}
+							<br />
+							: {userData.type}
+							<br />
+							: {userData.groupId}
+							<br />
+							: [ {[userData.end].join(', ')} ]
+							<br />
+							: {userData.distance}
+						</div>
+					</>
+				);
+				break;
+
+			default:
+				break;
+			}
+
+			if (content) handleChangeTooltipPos({clientX: e.clientX, clientY: e.clientY});
+		}
+
+		showTooltip.current = Boolean(content);
+		if (!showTooltip.current) handleHideTooltip();
+		if (data !== tooltipData.current) {
+			setToolTipContent(content);
+			tooltipData.current = data;
+		}
+	}, [selectedTool, toolTipPos]);
+
+	const floorsObj = useMemo(() => (
+		FloorsLevel.map((floor) =>
+			<FloorGrid
+				key={floor}
+				position={[0, floor, 0]}
+				size={MapSize}
+				textureSource={floorTexture}
+				onHover={handleOnHoverFloor}
+				onPointerDown={handleOnClickFloor}
+			/>,
+		)
+	), [floorTexture, handleOnClickFloor, handleOnHoverFloor]);
+
+	const wallsObj = useMemo(() => (
+		walls.map((wall) => (
+			<group
+				key={wall.id}
+				name={ObjectType.WALL}
+				userData={wall}
+				onPointerMove={handleChangeTooltipContent}
+				onPointerLeave={() => handleChangeTooltipContent()}
+			>
+				<Wall textureSource={wallTexture} {...wall} />
+			</group>
+		))
+	), [handleChangeTooltipContent, wallTexture, walls]);
+
+	const pathsObj = useMemo(() => {
+		const content = [];
+		let currentPathId = null;
+
+		paths.forEach((path, i) => {
+			if (i === 0 || path.groupId !== currentPathId) {
+				currentPathId = path.groupId;
+
+				content.push(
+					<group
+						key={'start-' + path.groupId}
+						name={PointType.PATH}
+						userData={{
+							type: PointType.SOURCE,
+							groupId: path.groupId,
+							start: path.start,
+							end: path.start,
+							distance: 0,
+						}}
+						onPointerMove={handleChangeTooltipContent}
+						onPointerLeave={() => handleChangeTooltipContent()}
+					>
+						<HoverMark
+							position={path.start}
+							type={MapTools.MANUAL_PATH}
+							label={PointType.SOURCE}
+							labelColor={ColorType.SOURCE}
+						/>
+					</group>,
+				);
+			}
+
+			content.push(
+				<group
+					key={[path.groupId, path.id].join('-')}
+					name={PointType.PATH}
+					userData={path}
+					onPointerMove={handleChangeTooltipContent}
+					onPointerLeave={() => handleChangeTooltipContent()}
+				>
+					<Path {...path} />
+				</group>,
+			);
+		});
+
+		return content;
+	}, [handleChangeTooltipContent, paths]);
+
+	const pointsObj = useMemo(() => (
+		points.map((point, i) =>
+			(
+				<group
+					key={i}
+					name={PointType.POINT_GUIDE}
+					userData={point.join(', ')}
+					onPointerMove={handleChangeTooltipContent}
+					onPointerLeave={() => handleChangeTooltipContent()}
+				>
+					<Point position={point} />
+				</group>
+			),
+		)
+	), [handleChangeTooltipContent, points]);
+
+	const stairsPointsObj = useMemo(() => (
+		StairsPoints.map(
+			(points, stairIdx) => points.map(
+				(point, ptIdx) => <Point key={`${stairIdx}-${ptIdx}`} position={point} />,
+			),
+		)
+	), []);
+
+	const stairsObj = useMemo(() => (
+		Stairs.map((stair, stairIdx) =>
+			<group key={stairIdx}>
+				<Stair
+					textureSource={floorTexture}
+					start={stair.start}
+					end={stair.end}
+				/>
+				{stair.platforms.map((_pos, platIdx) =>
+					<FloorGrid
+						key={platIdx}
+						position={_pos}
+						size={{width: StairWidth, length: StairWidth}}
+						textureSource={floorTexture}
+						onHover={(pos) => handleOnHoverFloor(pos, FloorType.STAIR, stairIdx)}
+						onPointerDown={(e) => handleOnClickFloor(e, FloorType.STAIR, stairIdx)}
+					/>)
+				}
+			</group>,
+		)
+	), [floorTexture, handleOnClickFloor, handleOnHoverFloor]);
 
 	return (
 		<div className='map-container' tabIndex={0} onKeyDown={handleOnKeyDown} >
-			<Canvas
-				camera={{fov: 50, position: [20, 14, 30]}}
-				// onPointerDown={() => setHoldClick(true)}
-				// onPointerUp={() => setHoldClick(false)}
-			>
+			<Canvas camera={{fov: 50, position: [20, 14, 30]}} >
 				<ambientLight intensity={1.2} />
 				<Suspense fallback={undefined}>
 					<Bounds fit clip observe margin={0.9}>
-						{FloorsLevel.map((floor) =>
-							<FloorGrid
-								key={floor}
-								position={[0, floor, 0]}
-								size={MapSize}
-								textureSource={floorTexture}
-								onHover={handleOnHoverFloor}
-								onPointerDown={handleOnClickFloor}
-							/>,
-						)}
+						{floorsObj}
+						{wallsObj}
+						{pathsObj}
+						{pointsObj}
+						{stairsPointsObj}
+						{stairsObj}
 
 						{ isCreatingWall
 							? <Wall y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} textureSource={wallTexture} error={invalidLine} />
@@ -299,24 +579,8 @@ function Map() {
 							: null
 						}
 
-						{walls.map((wall) => <Wall key={wall.id} textureSource={wallTexture} {...wall} />)}
-						{paths.map((path) => <Path key={path.id} {...path} />)}
-						{points.map((point, i) =>
-							(
-								<group name={PointType.POINT_GUIDE} key={i} >
-									<Point position={point} />
-								</group>
-							),
-						)}
-
-						{StairsPoints.map(
-							(points, stairIdx) => points.map(
-								(point, ptIdx) => <Point key={`${stairIdx}-${ptIdx}`} position={point} />,
-							),
-						)}
-
-						{ showSource
-							? <HoverMark position={holdPos} type={selectedTool} label={PointType.SOURCE} labelColor='green' />
+						{ isCreatingPath
+							? <HoverMark position={sourcePos} type={selectedTool} label={PointType.SOURCE} labelColor={ColorType.SOURCE} />
 							: null
 						}
 						{ showHoverMark
@@ -324,32 +588,12 @@ function Map() {
 							: null
 						}
 
-						{Stairs.map((stair, stairIdx) =>
-							<group key={stairIdx}>
-								<Stair
-									textureSource={floorTexture}
-									start={stair.start}
-									end={stair.end}
-								/>
-								{stair.platforms.map((_pos, platIdx) =>
-									<FloorGrid
-										key={platIdx}
-										position={_pos}
-										size={{width: StairWidth, length: StairWidth}}
-										textureSource={floorTexture}
-										onHover={(pos) => handleOnHoverFloor(pos, FloorType.STAIR, stairIdx)}
-										onPointerDown={(e) => handleOnClickFloor(e, FloorType.STAIR, stairIdx)}
-									/>)
-								}
-							</group>)
-						}
-
 					</Bounds>
 				</Suspense>
 				<OrbitControls makeDefault enableRotate={selectedTool === MapTools.ORBIT} />
 			</Canvas>
 
-			<div style={{ display: 'flex', position: 'absolute', top: 0, padding: 8, gap: 8}}>
+			<div className='map-tools' >
 				{toolButtons.map((button) => (
 					<Tooltip key={button.key} title={button.tooltip} >
 						<Button
@@ -375,6 +619,10 @@ function Map() {
 						Clear Items
 					</Button>
 				</Dropdown>
+			</div>
+
+			<div ref={tooltipRef} className="tooltip-container" style={showTooltip.current ? toolTipPos : null} >
+				{toolTipContent && toolTipContent}
 			</div>
 		</div>
 	);

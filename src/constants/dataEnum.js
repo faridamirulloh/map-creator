@@ -17,8 +17,9 @@ export const MarkType = {
 
 export const PointType = {
 	DESTINATION: 'Destination',
+	DIRECTION: 'Direction',
 	PATH: 'Path',
-	POINT_GUIDE: 'Point Guide',
+	POINT_GUIDE: 'Guide Point',
 	SOURCE: 'Source',
 	STAIR: 'Stair',
 };
@@ -38,4 +39,9 @@ export const ClearButtons = {
 export const FloorType = {
 	FLAT: 'FLAT',
 	STAIR: 'STAIR',
+};
+
+export const ColorType = {
+	SOURCE: 'green',
+	DESTINATION: 'blue',
 };

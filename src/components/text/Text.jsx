@@ -8,7 +8,7 @@ import { ArrayOfLength } from '../../libs/customPropTypes';
 extend({ TextGeometry });
 const defaultFont = new FontLoader().parse(HelvetikerRegular);
 
-function Text({label = '', position = [0, 0, 0], color = 'green', size = .3, width = .05}) {
+function Text({label = '', position = [0, 0, 0], color = 'black', size = .3, width = .05}) {
 	return (
 		<mesh position={position}>
 			<textGeometry args={[label, {font: defaultFont, size, depth: width}]}/>

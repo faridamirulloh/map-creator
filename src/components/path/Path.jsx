@@ -4,19 +4,21 @@ import { TextureLoader, Vector3 } from 'three';
 import PropTypes from 'prop-types';
 import { ArrayOfLength } from '../../libs/customPropTypes';
 import { PointHeight } from '../../constants/constant';
+import { MapTools, PointType } from '../../constants/dataEnum';
+import { HoverMark } from '../hoverMark/HoverMark';
 
 const colorRed = '/textures/red-shine.jpg';
 const colorGreen = '/textures/green-shine.jpg';
 const lineColorGreen = 'green';
 const lineColorRed = 'red';
 
-export function Dot({position = [0, 0, 0]}) {
+export function Dot({position = [0, 0, 0], type = ''}) {
 	const colorMap = useLoader(TextureLoader, colorRed);
 	const objRef = useRef();
 
 	return (
 		<mesh ref={objRef} position={[position[0], position[1] + PointHeight, position[2]]}>
-			<sphereGeometry args={[.3, 50, 50]} />
+			<sphereGeometry args={[type === PointType.DESTINATION ? .25 : .3, 50, 50]} />
 			<meshStandardMaterial
 				displacementScale={0}
 				map={colorMap}
@@ -27,6 +29,7 @@ export function Dot({position = [0, 0, 0]}) {
 
 Dot.propTypes = {
 	position: ArrayOfLength.bind(null, 3),
+	type: PropTypes.string,
 };
 
 export function Point({position = [0, 0, 0]}) {
@@ -48,7 +51,7 @@ Point.propTypes = {
 	position: ArrayOfLength.bind(null, 3),
 };
 
-export function Path({start = [0, 0, 0], end = [0, 0, 0], error = false}) {
+export function Path({start = [0, 0, 0], end = [0, 0, 0], error = false, type}) {
 	const lineRef = useRef();
 
 	useLayoutEffect(() => {
@@ -62,8 +65,10 @@ export function Path({start = [0, 0, 0], end = [0, 0, 0], error = false}) {
 
 	return (
 		<group>
-			<Dot position={start} />
-			<Dot position={end} />
+			{/* <Dot position={start} type={PointType.SOURCE} /> */}
+			{type === PointType.DESTINATION
+				? <HoverMark position={end} type={MapTools.MANUAL_PATH} label={PointType.DESTINATION} labelColor='blue' />
+				: <Dot position={end} type={PointType.DESTINATION} />}
 			<line ref={lineRef}>
 				<bufferGeometry />
 				<lineBasicMaterial color={error? lineColorRed : lineColorGreen} />
@@ -77,4 +82,5 @@ Path.propTypes = {
 	start: ArrayOfLength.bind(null, 3),
 	end: ArrayOfLength.bind(null, 3),
 	error: PropTypes.bool,
+	type: PropTypes.oneOf([PointType.SOURCE, PointType.DESTINATION, PointType.DIRECTION]),
 };
