@@ -4,14 +4,16 @@ import { TextureLoader, Vector2 } from 'three';
 import { FloorTextures } from '../../constants/textures';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { ArrayOfLength } from '../../libs/customPropTypes';
+import { FloorType, ObjectType } from '../../constants/dataEnum';
 
 const floorThick = 1;
 
 export function FloorGrid({
+	id = 0,
 	position = [0, 0, 0],
 	textureSource = FloorTextures[0].source,
 	size = {width: 1, length: 1},
-	onHover = () => {},
+	type = FloorType.FLAT,
 	onPointerDown = () => {},
 }) {
 	const isPointerOver = useRef();
@@ -29,40 +31,15 @@ export function FloorGrid({
 		textureMap.repeat = new Vector2(size.width/8, size.length/8);
 	}, [textureMap, size]);
 
-	const handlePointerMove = (e) => {
-		if (isPointerOver.current) {
-			try {
-				const {x, y, z} = e.intersections[0].point;
-				const point = {
-					x: Number(x.toFixed(0)),
-					y: Number(y.toFixed(0)),
-					z: Number(z.toFixed(0)),
-				};
-
-				onHover([point.x, point.y, point.z]);
-			} catch (error) {
-				console.error(error);
-			}
-		}
-	};
-
-	const handlePointerEnter = () => {
-		isPointerOver.current = true;
-	};
-
-	const handlePointerLeave = () => {
-		onHover();
-		isPointerOver.current = false;
-	};
+	if (isPointerOver.current) console.log(position[1]);
 
 	return (
 		<group position={position}>
 			<mesh
+				name={ObjectType.FLOOR}
+				userData={{type, id}}
 				position={[size.width/2, -floorThick/2, size.length/2]}
-				onPointerEnter={handlePointerEnter}
-				onPointerLeave={handlePointerLeave}
 				onPointerDown={onPointerDown}
-				onPointerMove={handlePointerMove}
 			>
 				<boxGeometry args={[size.width, 1, size.length]} />
 				<meshStandardMaterial
@@ -75,10 +52,11 @@ export function FloorGrid({
 }
 
 FloorGrid.propTypes= {
+	id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 	position: ArrayOfLength.bind(null, 3),
 	textureSource: PropTypes.oneOf(FloorTextures.map(({source}) => source)),
 	size: PropTypes.shape({width: PropTypes.number, length: PropTypes.number}),
 	selectedTile: PropTypes.number,
-	onHover: PropTypes.func,
+	type: PropTypes.oneOf(Object.values(FloorType)),
 	onPointerDown: PropTypes.func,
 };

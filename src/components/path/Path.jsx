@@ -65,7 +65,6 @@ export function Path({start = [0, 0, 0], end = [0, 0, 0], error = false, type}) 
 
 	return (
 		<group>
-			{/* <Dot position={start} type={PointType.SOURCE} /> */}
 			{type === PointType.DESTINATION
 				? <HoverMark position={end} type={MapTools.MANUAL_PATH} label={PointType.DESTINATION} labelColor='blue' />
 				: <Dot position={end} type={PointType.DESTINATION} />}

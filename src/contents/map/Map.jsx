@@ -35,7 +35,7 @@ const initWalls = [...WallPreset1, ...WallPreset2];
 function Map() {
 	const [floorTexture, setFloorTexture] = useState(FloorTextures[0].source);
 	const [wallTexture, setWallTexture] = useState(WallTextures[0].source);
-	const [selectedTool, selectTool] = useState(MapTools.AUTO_PATH);
+	const [selectedTool, selectTool] = useState(MapTools.ORBIT);
 	const [histories, setHistories] = useState([{walls: initWalls, paths: [], points: initPoints, selected: true}]);
 	const [walls, setWalls] = useState(initWalls);
 	const [points, setPoints] = useState(initPoints);
@@ -93,7 +93,7 @@ function Map() {
 			}
 		} else {
 			const obstacles = isCreatingPath ? walls : paths;
-			invalidLine = isInvalidLine([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], obstacles.filter(({y}) => y === holdPos[1]));
+			invalidLine = isInvalidLine([holdPos[0], holdPos[2]], [hoverPos[0], hoverPos[2]], obstacles.filter(({y, start}) => y ? y === holdPos[1] : start[1] === holdPos[1] ));
 		}
 	}
 
@@ -204,11 +204,6 @@ function Map() {
 		}
 	};
 
-	const handleOnHoverFloor = useCallback((pos, floorType = FloorType.FLAT, id) => {
-		if (!isEqual(pos, hoverPos)) setHoverPos(pos);
-		if (!isEqual({type: floorType, id}, hoverFloor)) setHoverFloor({type: floorType, id});
-	}, [hoverFloor, hoverPos]);
-
 	const handleOnClickFloor = useCallback((e, floorType = FloorType.FLAT, id) => {
 		if (e.button === 0) {
 			const createWall = () => {
@@ -224,6 +219,7 @@ function Map() {
 			};
 
 			const createPath = () => {
+				console.log('Create Path...', !invalidLine);
 				if (!invalidLine) {
 					const newPaths = cloneDeep(paths);
 					const lastPath = newPaths[newPaths.length -1];
@@ -232,7 +228,9 @@ function Map() {
 
 					if (lastPath && lastPath?.groupId === pathGroupId.current) lastPath.type = PointType.DIRECTION;
 
-					const	distance = (lastPath.type === PointType.DIRECTION ? lastPath?.distance || 0 : 0) + calculateDistance2D(holdPos[0], holdPos[2], hoverPos[0], hoverPos[2]);
+					const	distance =
+						(lastPath && lastPath.type === PointType.DIRECTION ? lastPath.distance || 0 : 0)
+						+ calculateDistance2D(holdPos[0], holdPos[2], hoverPos[0], hoverPos[2]);
 
 					newPaths.push({
 						id: newId,
@@ -249,9 +247,9 @@ function Map() {
 			};
 
 			const createAutoPath = () => {
-				console.log('Generating Path...');
-				console.log('from : ', holdPos);
-				console.log('to : ', hoverPos);
+				console.log('Finding Shortest Path...');
+				console.log('from : ', ...holdPos);
+				console.log('to : ', ...hoverPos);
 				const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
 				const y = holdPos[1];
 				const newPaths = [];
@@ -348,7 +346,7 @@ function Map() {
 			data = userData;
 
 			switch (name) {
-			case PointType.POINT_GUIDE:
+			case PointType.WAYPOINT:
 				content = (
 					<>
 						<div className='tooltip-label'>
@@ -436,18 +434,64 @@ function Map() {
 		}
 	}, [selectedTool, toolTipPos]);
 
-	const floorsObj = useMemo(() => (
-		FloorsLevel.map((floor) =>
-			<FloorGrid
-				key={floor}
-				position={[0, floor, 0]}
-				size={MapSize}
-				textureSource={floorTexture}
-				onHover={handleOnHoverFloor}
-				onPointerDown={handleOnClickFloor}
-			/>,
-		)
-	), [floorTexture, handleOnClickFloor, handleOnHoverFloor]);
+	const floorsObj = useMemo(() => {
+		const handlePointerMove = (e) => {
+			const obj = e.intersections.find(({eventObject}) => eventObject.name === ObjectType.FLOOR);
+			if (obj) {
+				const {x, y, z} = obj.point;
+				const pos = [
+					Number(x.toFixed(0)),
+					Number(y.toFixed(0)),
+					Number(z.toFixed(0)),
+				];
+
+				if (!isEqual(pos, hoverPos)) setHoverPos(pos);
+				if (!isEqual(obj.eventObject.userData, hoverFloor)) setHoverFloor(obj.eventObject.userData);
+			}
+		};
+
+		return (
+			<group
+				onPointerMove={handlePointerMove}
+				onPointerLeave={() => {
+					setHoverPos();
+					setHoverFloor();
+				}}
+			>
+				{FloorsLevel.map((floor, i) =>
+					<FloorGrid
+						key={i}
+						id={i}
+						type={FloorType.FLAT}
+						position={[0, floor, 0]}
+						size={MapSize}
+						textureSource={floorTexture}
+						onPointerDown={handleOnClickFloor}
+					/>,
+				)}
+				{Stairs.map((stair, stairIdx) =>
+					<group key={stairIdx}>
+						<Stair
+							textureSource={floorTexture}
+							start={stair.start}
+							end={stair.end}
+						/>
+						{stair.platforms.map((_pos, platIdx) =>
+							<FloorGrid
+								key={platIdx}
+								id={stairIdx}
+								type={FloorType.STAIR}
+								position={_pos}
+								size={{width: StairWidth, length: StairWidth}}
+								textureSource={floorTexture}
+								onPointerDown={(e) => handleOnClickFloor(e, FloorType.STAIR, stairIdx)}
+							/>)
+						}
+					</group>,
+				)}
+			</group>
+		);
+	}, [floorTexture, handleOnClickFloor, hoverFloor, hoverPos]);
 
 	const wallsObj = useMemo(() => (
 		walls.map((wall) => (
@@ -516,7 +560,7 @@ function Map() {
 			(
 				<group
 					key={i}
-					name={PointType.POINT_GUIDE}
+					name={PointType.WAYPOINT}
 					userData={point.join(', ')}
 					onPointerMove={handleChangeTooltipContent}
 					onPointerLeave={() => handleChangeTooltipContent()}
@@ -535,28 +579,6 @@ function Map() {
 		)
 	), []);
 
-	const stairsObj = useMemo(() => (
-		Stairs.map((stair, stairIdx) =>
-			<group key={stairIdx}>
-				<Stair
-					textureSource={floorTexture}
-					start={stair.start}
-					end={stair.end}
-				/>
-				{stair.platforms.map((_pos, platIdx) =>
-					<FloorGrid
-						key={platIdx}
-						position={_pos}
-						size={{width: StairWidth, length: StairWidth}}
-						textureSource={floorTexture}
-						onHover={(pos) => handleOnHoverFloor(pos, FloorType.STAIR, stairIdx)}
-						onPointerDown={(e) => handleOnClickFloor(e, FloorType.STAIR, stairIdx)}
-					/>)
-				}
-			</group>,
-		)
-	), [floorTexture, handleOnClickFloor, handleOnHoverFloor]);
-
 	return (
 		<div className='map-container' tabIndex={0} onKeyDown={handleOnKeyDown} >
 			<Canvas camera={{fov: 50, position: [20, 14, 30]}} >
@@ -568,7 +590,7 @@ function Map() {
 						{pathsObj}
 						{pointsObj}
 						{stairsPointsObj}
-						{stairsObj}
+						{/* {stairsObj} */}
 
 						{ isCreatingWall
 							? <Wall y={holdPos[1]} start={[holdPos[0], holdPos[2]]} end={[hoverPos[0], hoverPos[2]]} textureSource={wallTexture} error={invalidLine} />

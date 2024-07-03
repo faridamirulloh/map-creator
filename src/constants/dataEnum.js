@@ -19,12 +19,13 @@ export const PointType = {
 	DESTINATION: 'Destination',
 	DIRECTION: 'Direction',
 	PATH: 'Path',
-	POINT_GUIDE: 'Guide Point',
+	WAYPOINT: 'Waypoint',
 	SOURCE: 'Source',
 	STAIR: 'Stair',
 };
 
 export const ObjectType = {
+	FLOOR: 'Floor',
 	POINT: 'Point',
 	WALL: 'Wall',
 };

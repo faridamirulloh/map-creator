@@ -7,8 +7,8 @@ export const isInvalidLine = (startPoint, endPoint, obstacles) => {
 	const q1 = {x: endPoint[0], y: endPoint[1]};
 
 	obstacles.forEach(({start, end}) => {
-		const p2 = {x: start[0], y: start[1]};
-		const q2 = {x: end[0], y: end[1]};
+		const p2 = {x: start[0], y: start[start.length-1]};
+		const q2 = {x: end[0], y: end[end.length-1]};
 		if (doIntersect(p1, q1, p2, q2)) invalid = true;
 	});
 
