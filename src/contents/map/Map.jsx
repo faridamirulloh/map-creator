@@ -35,7 +35,7 @@ const initWalls = [...WallPreset1, ...WallPreset2];
 function Map() {
 	const [floorTexture, setFloorTexture] = useState(FloorTextures[0].source);
 	const [wallTexture, setWallTexture] = useState(WallTextures[0].source);
-	const [selectedTool, selectTool] = useState(MapTools.ORBIT);
+	const [selectedTool, selectTool] = useState(MapTools.AUTO_PATH);
 	const [histories, setHistories] = useState([{walls: initWalls, paths: [], points: initPoints, selected: true}]);
 	const [walls, setWalls] = useState(initWalls);
 	const [points, setPoints] = useState(initPoints);
@@ -230,10 +230,9 @@ function Map() {
 					const newId = newPaths.length > 0 ? lastPath.id + 1 : 1;
 					let type = PointType.DESTINATION;
 
-					// if (!lastPath || lastPath?.groupId !== pathGroupId.current) type = PointType.SOURCE;
-					if (lastPath && lastPath?.groupId === pathGroupId.current && lastPath.type !== PointType.SOURCE) lastPath.type = PointType.DIRECTION;
+					if (lastPath && lastPath?.groupId === pathGroupId.current) lastPath.type = PointType.DIRECTION;
 
-					const	distance = (type === PointType.DESTINATION ? lastPath?.distance || 0 : 0) + calculateDistance2D(holdPos[0], holdPos[2], hoverPos[0], hoverPos[2]);
+					const	distance = (lastPath.type === PointType.DIRECTION ? lastPath?.distance || 0 : 0) + calculateDistance2D(holdPos[0], holdPos[2], hoverPos[0], hoverPos[2]);
 
 					newPaths.push({
 						id: newId,
@@ -251,6 +250,8 @@ function Map() {
 
 			const createAutoPath = () => {
 				console.log('Generating Path...');
+				console.log('from : ', holdPos);
+				console.log('to : ', hoverPos);
 				const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
 				const y = holdPos[1];
 				const newPaths = [];
