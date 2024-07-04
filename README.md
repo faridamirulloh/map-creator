@@ -1,8 +1,15 @@
-# React + Vite
+# Map Generator And Path Finder
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Prerequisite:
+- Node version 20^
 
-Currently, two official plugins are available:
+How to run:
+  - run 'yarn' // to install the packages
+  - run 'yarn dev' // to run development program
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+You can view this app here:
+- [Map Generator And Path Finder](https://my-app-123321.web.app/)
+
+How the pathfinder in this app works:
+
+  It identifies all available nodes (waypoints) and measures the distance from the source to the destination, then compares these distances with other available paths to find the shortest route. It continues searching for nodes closest to the destination until it reaches the destination node.
