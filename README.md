@@ -1,7 +1,8 @@
 # Map Generator And Path Finder
 
 Prerequisite:
-- Node version 20^
+- Node version 20.11^
+- Yarn version 1.22^
 
 How to run:
   - run 'yarn' // to install the packages
