@@ -13,8 +13,8 @@ import { FloorTextures, WallTextures } from '../../constants/textures';
 import { cloneDeep, isEqual } from 'lodash';
 import { HoverMark } from '../../components/hoverMark/HoverMark';
 import { generatePath, isInvalidLine } from '../../stores/businesses/pathingBusinesses';
-import { WallPreset1, WallPreset2 } from '../../constants/presetWalls';
-import { PointsPreset1, PointsPreset2 } from '../../constants/presetPoints';
+import { WallPreset1, WallPresetBorder } from '../../constants/presetWalls';
+import { PointsPreset1, PointsPresetBorder } from '../../constants/presetPoints';
 import { Stair } from '../../components/stair/Stair';
 import { StairWidth, MapSize, FloorsLevel, Stairs, StairsPoints } from '../../constants/constant';
 import { calculateDistance2D } from '../../libs/calcHelper';
@@ -29,8 +29,13 @@ const toolButtons = [
 	{ key: MapTools.REDO, tooltip: 'Redo (Ctrl + Y)', icon: <RedoOutlined />},
 ];
 
-const initPoints = [...PointsPreset1, ...PointsPreset2];
-const initWalls = [...WallPreset1, ...WallPreset2];
+const presets = [
+	{label: 'Preset 1', walls: WallPreset1, points: PointsPreset1},
+	{label: 'Border', walls: WallPresetBorder, points: PointsPresetBorder},
+];
+
+const initPoints = PointsPreset1;
+const initWalls = WallPreset1;
 
 function Map() {
 	const [messageApi, contextHolder] = message.useMessage();
@@ -53,6 +58,15 @@ function Map() {
 	const showTooltip = useRef(false);
 	const tooltipData = useRef();
 	const tooltipRef = useRef();
+
+	const presetsItems = presets.map((preset, idx) => ({
+		key: idx,
+		label: preset.label,
+		onClick: () => {
+			updateWalls(presets[idx].walls);
+			updatePoints(presets[idx].points);
+		},
+	}));
 
 	const floorItems = FloorTextures.map((floor) => ({
 		key: floor.label,
@@ -660,6 +674,11 @@ function Map() {
 				<Dropdown menu={{items: clearItems}} trigger={['click']} >
 					<Button type={'default'} icon={<DownOutlined />} iconPosition='end' >
 						Clear Items
+					</Button>
+				</Dropdown>
+				<Dropdown menu={{items: presetsItems}} trigger={['click']} >
+					<Button type={'default'} icon={<DownOutlined />} iconPosition='end' >
+						Presets
 					</Button>
 				</Dropdown>
 			</div>

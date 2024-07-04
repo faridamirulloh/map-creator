@@ -124,9 +124,6 @@ export const PointsPreset1 = [
 		0,
 		28,
 	],
-];
-
-export const PointsPreset2 = [
 	[
 		47,
 		15,
@@ -256,5 +253,38 @@ export const PointsPreset2 = [
 		47,
 		15,
 		15,
+	],
+];
+
+export const PointsPresetBorder = [
+	[
+		2,
+		15,
+		14,
+	],
+	[
+		31,
+		15,
+		2,
+	],
+	[
+		48,
+		15,
+		14,
+	],
+	[
+		48,
+		0,
+		28,
+	],
+	[
+		2,
+		0,
+		28,
+	],
+	[
+		48,
+		0,
+		2,
 	],
 ];
