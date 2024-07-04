@@ -102,7 +102,7 @@ function Map() {
 	const isCreatingPath = (selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.AUTO_PATH) && holdPos && hoverPos;
 
 	let invalidLine = false;
-	if ((isCreatingPath && selectedTool === MapTools.MANUAL_PATH) || (isCreatingWall && holdPos[1] === hoverPos[1])) {
+	if (holdFloor && hoverFloor && (isCreatingPath && selectedTool === MapTools.MANUAL_PATH) || (isCreatingWall && holdPos[1] === hoverPos[1])) {
 		if (isCreatingPath && holdPos[1] !== hoverPos[1]) {
 			if (holdFloor.type !== FloorType.STAIR || hoverFloor.type !== FloorType.STAIR || holdFloor.id !== hoverFloor.id) {
 				invalidLine = true;
