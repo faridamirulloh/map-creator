@@ -33,4 +33,26 @@
       width: 50px;
     }
   }
+
+  .loading {
+    display: flex;
+    position: absolute;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    width: 100vw;
+    height: 100vh;
+    background-color: #00000090;
+    font-size: x-large;
+    font-weight: 600;
+    top: 0;
+    left: 0;
+
+    .text-border {
+      padding: 20px;
+      border: 2px solid grey;
+      border-radius: 10px;
+      background-color: #FFFFFF90;
+    }
+  }
 }

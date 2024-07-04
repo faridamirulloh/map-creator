@@ -122,6 +122,7 @@ export const generatePath = (source = [], destination = [], points = [], obsatcl
 	}
 
 	while (!doArrived(paths, destination)) {
+		if (paths.length === 0) throw 'No Path Available';
 		const index = getNearestPathIndex(paths, destination, stairs);
 		const lastPoint = paths[index][paths[index].length - 1];
 

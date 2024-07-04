@@ -43,7 +43,7 @@ export function HoverMark({position = [0, 0, 0], type = MarkType.POINT, wallText
 		switch (type) {
 		case MarkType[MapTools.MANUAL_PATH]:
 		case MarkType[MapTools.AUTO_PATH]:
-		case MarkType[MapTools.POINT]:
+		case MarkType[MapTools.WAYPOINT]:
 			return (
 				<>
 					<group position={[0, PointHeight, 0]}>

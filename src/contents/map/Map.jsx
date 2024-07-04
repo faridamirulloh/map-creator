@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Bounds, OrbitControls } from '@react-three/drei';
 import { FloorGrid } from '../../components/floorGrid/FloorGrid';
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
-import { Button, Dropdown, Tooltip } from 'antd';
+import { Button, Dropdown, Tooltip, message } from 'antd';
 import { AppstoreFilled, DownCircleOutlined, DownOutlined, NodeIndexOutlined, RedoOutlined, RetweetOutlined, RiseOutlined, UndoOutlined } from '@ant-design/icons';
 import { MapTools, PointType, ClearButtons, FloorType, ObjectType, ColorType } from '../../constants/dataEnum';
 import { Wall } from '../../components/wall/Wall';
@@ -22,7 +22,7 @@ import { calculateDistance2D } from '../../libs/calcHelper';
 const toolButtons = [
 	{ key: MapTools.ORBIT, tooltip: 'Orbit (Q)', icon: <RetweetOutlined />},
 	{ key: MapTools.WALL, tooltip: 'Wall (W)', icon: <AppstoreFilled />},
-	{ key: MapTools.POINT, tooltip: 'Guide Point (A)', icon: <DownCircleOutlined />},
+	{ key: MapTools.WAYPOINT, tooltip: 'Waypoint (A)', icon: <DownCircleOutlined />},
 	{ key: MapTools.MANUAL_PATH, tooltip: 'Manual Path (E)', icon: <RiseOutlined />},
 	{ key: MapTools.AUTO_PATH, tooltip: 'Auto Path (Shift + E)', icon: <NodeIndexOutlined />},
 	{ key: MapTools.UNDO, tooltip: 'Undo (Ctrl + Z)', icon: <UndoOutlined />},
@@ -33,6 +33,8 @@ const initPoints = [...PointsPreset1, ...PointsPreset2];
 const initWalls = [...WallPreset1, ...WallPreset2];
 
 function Map() {
+	const [messageApi, contextHolder] = message.useMessage();
+	const [loading, setLoading] = useState();
 	const [floorTexture, setFloorTexture] = useState(FloorTextures[0].source);
 	const [wallTexture, setWallTexture] = useState(WallTextures[0].source);
 	const [selectedTool, selectTool] = useState(MapTools.ORBIT);
@@ -70,7 +72,7 @@ function Map() {
 		),
 	}));
 
-	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.POINT) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
+	const showHoverMark = hoverPos && (((selectedTool === MapTools.WALL || selectedTool === MapTools.MANUAL_PATH || selectedTool === MapTools.WAYPOINT) && !holdPos ) || selectedTool === MapTools.AUTO_PATH);
 	let hoverMarkLabel, hoverMarkLabelColor;
 	if (showHoverMark && selectedTool === MapTools.AUTO_PATH) {
 		if (!holdPos) {
@@ -190,7 +192,7 @@ function Map() {
 		case 'q': handleOnClickTools(MapTools.ORBIT); break;
 		case 'w': handleOnClickTools(MapTools.WALL); break;
 		case 'e': handleOnClickTools(e.shiftKey? MapTools.AUTO_PATH : MapTools.MANUAL_PATH); break;
-		case 'a': handleOnClickTools(MapTools.POINT); break;
+		case 'a': handleOnClickTools(MapTools.WAYPOINT); break;
 		case 'escape': setHoldPos(); break;
 		default: break;
 		}
@@ -250,27 +252,40 @@ function Map() {
 				console.log('Finding Shortest Path...');
 				console.log('from : ', ...holdPos);
 				console.log('to : ', ...hoverPos);
-				const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
-				const y = holdPos[1];
-				const newPaths = [];
-				pathGroupId.current += 1;
+				try {
+					const path = generatePath(holdPos, hoverPos, points, walls, StairsPoints);
+					const y = holdPos[1];
+					const newPaths = [];
+					pathGroupId.current += 1;
 
-				path.forEach(({pos, distance}, i) => {
-					if (i > 0) {
-						newPaths.push({
-							id: i, y,
-							start: path[i-1].pos,
-							end: pos,
-							groupId: pathGroupId.current,
-							type: i === path.length -1 ? PointType.DESTINATION : PointType.DIRECTION,
-							distance: Number(distance.toFixed(1)),
-						});
-					}
-				});
+					path.forEach(({pos, distance}, i) => {
+						if (i > 0) {
+							newPaths.push({
+								id: i, y,
+								start: path[i-1].pos,
+								end: pos,
+								groupId: pathGroupId.current,
+								type: i === path.length -1 ? PointType.DESTINATION : PointType.DIRECTION,
+								distance: Number(distance.toFixed(1)),
+							});
+						}
+					});
 
-				updatePaths([...paths, ...newPaths]);
-				setHoldPos();
-				console.log('Path Found!');
+					updatePaths([...paths, ...newPaths]);
+					setHoldPos();
+					console.log('Path Found!');
+					messageApi.open({
+						type: 'success',
+						content: 'Path Found With Distance ' + path[path.length - 1]?.distance?.toFixed(1),
+					});
+				} catch (error) {
+					messageApi.open({
+						type: 'error',
+						content: String(error),
+					});
+				}
+
+				setLoading();
 			};
 
 			const initiateObject = () => {
@@ -293,7 +308,10 @@ function Map() {
 				switch (selectedTool) {
 				case MapTools.WALL: createWall(); break;
 				case MapTools.MANUAL_PATH: createPath(); break;
-				case MapTools.AUTO_PATH: createAutoPath(); break;
+				case MapTools.AUTO_PATH:
+					setLoading('Finding Shortest Path...');
+					setTimeout(createAutoPath, 1);
+					break;
 
 				default: break;
 				}
@@ -305,18 +323,20 @@ function Map() {
 			// eslint-disable-next-line no-fallthrough
 			case MapTools.WALL:
 			case MapTools.AUTO_PATH:
-				if (holdPos) createObject();
-				else initiateObject();
+				if (hoverPos){
+					if (holdPos) createObject();
+					else initiateObject();
+				}
 				break;
 
-			case MapTools.POINT:
+			case MapTools.WAYPOINT:
 				updatePoints([...points, hoverPos]);
 				break;
 
 			default: break;
 			}
 		}
-	}, [holdFloor, holdPos, hoverPos, invalidLine, paths, points, selectedTool, updatePaths, updatePoints, updateWalls, walls]);
+	}, [holdFloor, holdPos, hoverPos, invalidLine, messageApi, paths, points, selectedTool, updatePaths, updatePoints, updateWalls, walls]);
 
 	const handleChangeTooltipContent = useCallback((e) => {
 		let content = null;
@@ -383,7 +403,7 @@ function Map() {
 							<br />
 							: [ {userData.start.join(', ')} ]
 							<br />
-							: ({userData.end.join(', ')})
+							: [ {userData.end.join(', ')} ]
 							<br />
 							: {userData.y}
 						</div>
@@ -647,6 +667,16 @@ function Map() {
 			<div ref={tooltipRef} className="tooltip-container" style={showTooltip.current ? toolTipPos : null} >
 				{toolTipContent && toolTipContent}
 			</div>
+
+			{contextHolder}
+			{loading ?
+				<div className='loading'>
+					<div className='text-border'>
+						{loading}
+					</div>
+				</div>
+				: null
+			}
 		</div>
 	);
 }
